@@ -1,5 +1,6 @@
 package com.highlightspawner.render;
 
+import com.highlightspawner.config.SpawnerHighlightConfig;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -29,15 +30,32 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
 
     @Override
     public void afterTranslucent(WorldRenderContext context) {
+        // Hentikan rendering jika highlight dimatikan
+        if (!SpawnerHighlightConfig.INSTANCE.highlightEnabled) {
+            return;
+        }
+
+        // Ambil nilai konfigurasi
+        float offset = SpawnerHighlightConfig.INSTANCE.outlineOffset;
+        float red   = SpawnerHighlightConfig.INSTANCE.red;
+        float green = SpawnerHighlightConfig.INSTANCE.green;
+        float blue  = SpawnerHighlightConfig.INSTANCE.blue;
+        float alpha = SpawnerHighlightConfig.INSTANCE.alpha;
+        int activationRange = SpawnerHighlightConfig.INSTANCE.spawnerActivationRange;
+
+
+
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) {
             return;
         }
 
-        List<BlockPos> spawnerPositions = findSpawnersInRange(client.player, client.world);
+        // Gunakan nilai activationRange dari konfigurasi saat mencari spawner
+        List<BlockPos> spawnerPositions = findSpawnersInRange(client.player, client.world, activationRange);
         if (spawnerPositions.isEmpty()) {
             return;
         }
+
 
         MatrixStack matrices = context.matrixStack();
         matrices.push();
@@ -63,7 +81,7 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
         VertexConsumer lineConsumer = immediate.getBuffer(RenderLayer.getLines());
 
         for (BlockPos pos : spawnerPositions) {
-            drawSpawnerOutline(matrices, lineConsumer, pos);
+            drawSpawnerOutline(matrices, lineConsumer, pos, offset, red, green, blue, alpha);
         }
         immediate.draw();
 
@@ -80,12 +98,12 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
 
 
 
-    private List<BlockPos> findSpawnersInRange(PlayerEntity player, World world) {
+    private List<BlockPos> findSpawnersInRange(PlayerEntity player, World world, int activationRange) {
         List<BlockPos> spawners = new ArrayList<>();
         BlockPos playerPos = player.getBlockPos();
 
         // Scan sekitar area pemain untuk mencari spawner
-        int scanRange = SPAWNER_ACTIVATION_RANGE + 4; // Sedikit lebih jauh dari activation range
+        int scanRange = activationRange + 4; // Sedikit lebih jauh dari activation range
 
         for (int x = -scanRange; x <= scanRange; x++) {
             for (int y = -scanRange; y <= scanRange; y++) {
@@ -94,9 +112,8 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
 
                     // Cek apakah blok adalah spawner
                     if (world.getBlockState(checkPos).getBlock() == Blocks.SPAWNER) {
-                        // Cek apakah jarak antara pemain dan spawner dalam jangkauan aktivasi
-                        double distance = Math.sqrt(checkPos.getSquaredDistance(playerPos));
-                        if (distance <= SPAWNER_ACTIVATION_RANGE) {
+                        // Cek jarak menggunakan squared distance (lebih efisien)
+                        if (checkPos.getSquaredDistance(playerPos) <= activationRange * activationRange) {
                             spawners.add(checkPos);
                         }
                     }
@@ -107,40 +124,41 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
         return spawners;
     }
 
-    private void drawSpawnerOutline(MatrixStack matrices, VertexConsumer lineConsumer, BlockPos pos) {
+    private void drawSpawnerOutline(MatrixStack matrices, VertexConsumer lineConsumer, BlockPos pos, float offset,
+                                    float red, float green, float blue, float alpha) {
         // Buat box sedikit lebih besar dari blok untuk outline
-        Box box = new Box(pos).expand(0.05);
+        Box box = new Box(pos).expand(offset);
 
         // Dapatkan matrix untuk transformasi posisi
         Matrix4f matrix = matrices.peek().getPositionMatrix();
 
         // Bottom face
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.minZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.maxZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.maxZ);
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.minZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.maxZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.maxZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.minZ, red, green, blue, alpha);
 
         // Top face
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ);
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.minZ, red, green, blue, alpha);
 
         // Connecting edges
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.minX, (float)box.maxY, (float)box.minZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ);
-        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ);
-        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.minX, (float)box.maxY, (float)box.minZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ, red, green, blue, alpha);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ, red, green, blue, alpha);
     }
 
-    private void drawLine(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2) {
+    private void drawLine(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2, float red, float green, float blue, float alpha) {
         // Vertex pertama
         builder.vertex(matrix, x1, y1, z1);
-        builder.color(RED, GREEN, BLUE, ALPHA);
+        builder.color(red, green, blue, alpha); // Gunakan parameter warna
         builder.normal(1, 0, 0);
         // Vertex kedua
         builder.vertex(matrix, x2, y2, z2);
-        builder.color(RED, GREEN, BLUE, ALPHA);
+        builder.color(red, green, blue, alpha); // Gunakan parameter warna
         builder.normal(1, 0, 0);
     }
 }

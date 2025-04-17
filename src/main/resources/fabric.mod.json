@@ -15,17 +15,22 @@
 	"icon": "assets/highlight-spawner/icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": [
-			"com.highlightspawner.HighlightSpawner"
-		],
 		"client": [
 			"com.highlightspawner.HighlightSpawnerClient"
+		],
+		"modmenu": [
+			"com.highlightspawner.integration.ModMenuIntegration"
 		]
 	},
+	"mixins": [
+		"highlight-spawner.mixins.json"
+	],
 	"depends": {
 		"fabricloader": ">=0.14.21",
 		"minecraft": "~1.21.4",
 		"java": ">=21",
-		"fabric-api": "*"
+		"fabric-api": "*",
+		"cloth-config": "*",
+		"modmenu": "*"
 	}
 }

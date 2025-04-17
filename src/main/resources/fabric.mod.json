@@ -2,16 +2,16 @@
 	"schemaVersion": 1,
 	"id": "highlight-spawner",
 	"version": "${version}",
-	"name": "Highlight spawner",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "Highlight Spawner",
+	"description": "Highlights spawners when player is within their activation range",
 	"authors": [
-		"Me!"
+		"Your Name Here"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/yourusername/highlight-spawner",
+		"sources": "https://github.com/yourusername/highlight-spawner"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/highlight-spawner/icon.png",
 	"environment": "*",
 	"entrypoints": {
@@ -22,20 +22,10 @@
 			"com.highlightspawner.HighlightSpawnerClient"
 		]
 	},
-	"mixins": [
-		"highlight-spawner.mixins.json",
-		{
-			"config": "highlight-spawner.client.mixins.json",
-			"environment": "client"
-		}
-	],
 	"depends": {
-		"fabricloader": ">=0.16.13",
+		"fabricloader": ">=0.14.21",
 		"minecraft": "~1.21.4",
 		"java": ">=21",
 		"fabric-api": "*"
-	},
-	"suggests": {
-		"another-mod": "*"
 	}
 }

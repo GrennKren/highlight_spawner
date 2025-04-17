@@ -1,10 +1,15 @@
 package com.highlightspawner;
 
+import com.highlightspawner.render.SpawnerHighlightRenderer;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 public class HighlightSpawnerClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		// This entrypoint is suitable for setting up client-specific logic, such as rendering.
+		HighlightSpawner.LOGGER.info("Initializing Highlight Spawner Client");
+
+		// Register our renderer to the WorldRenderEvents
+		WorldRenderEvents.AFTER_TRANSLUCENT.register(new SpawnerHighlightRenderer());
 	}
 }

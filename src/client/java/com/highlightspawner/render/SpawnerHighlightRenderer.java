@@ -30,80 +30,55 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
     @Override
     public void afterTranslucent(WorldRenderContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
-        PlayerEntity player = client.player;
-        World world = client.world;
-
-        if (player == null || world == null) {
+        if (client.player == null || client.world == null) {
             return;
         }
 
-        // Cari spawner dalam jangkauan pemain
-        List<BlockPos> spawnerPositions = findSpawnersInRange(player, world);
-
-        if (!spawnerPositions.isEmpty()) {
-            // Siapkan rendering
-            MatrixStack matrices = context.matrixStack();
-            matrices.push();
-
-            // Kompensasi untuk camera position
-            Vec3d cameraPos = context.camera().getPos();
-            matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
-
-            // Simpan state rendering saat ini
-            boolean depthEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_TEST);
-            boolean blendEnabled = GL11.glGetBoolean(GL11.GL_BLEND);
-            boolean cullEnabled = GL11.glGetBoolean(GL11.GL_CULL_FACE);
-            int depthFunc = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
-
-            // Setup untuk X-ray rendering yang kuat
-            RenderSystem.enableBlend();
-            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            RenderSystem.disableCull();
-
-            // Set depth function ke GL_ALWAYS untuk memastikan garis selalu terlihat
-            // ini adalah kunci untuk efek X-ray yang benar
-            GL11.glDepthFunc(GL11.GL_ALWAYS);
-
-            // Tetap aktifkan depth test tapi dengan fungsi ALWAYS
-            // ini membuat garis selalu dirender tanpa peduli apa yang ada di depannya
-            RenderSystem.enableDepthTest();
-
-            // Gunakan line width yang lebih tebal agar mudah terlihat
-            GL11.glLineWidth(3.0f);
-
-            // Dapatkan buffer untuk rendering
-            VertexConsumerProvider.Immediate immediate = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
-            VertexConsumer lineConsumer = immediate.getBuffer(RenderLayer.getLines());
-
-            // Render semua spawner
-            for (BlockPos pos : spawnerPositions) {
-                drawSpawnerOutline(matrices, lineConsumer, pos);
-            }
-
-            // Flush drawing
-            immediate.draw();
-
-            // Reset line width
-            GL11.glLineWidth(1.0f);
-
-            // Kembalikan state rendering ke kondisi semula
-            if (depthEnabled) {
-                GL11.glDepthFunc(depthFunc);
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-
-            if (!blendEnabled) {
-                RenderSystem.disableBlend();
-            }
-
-            if (cullEnabled) {
-                RenderSystem.enableCull();
-            }
-
-            matrices.pop();
+        List<BlockPos> spawnerPositions = findSpawnersInRange(client.player, client.world);
+        if (spawnerPositions.isEmpty()) {
+            return;
         }
+
+        MatrixStack matrices = context.matrixStack();
+        matrices.push();
+        Vec3d cameraPos = context.camera().getPos();
+        matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+
+        // Simpan state state yang Anda ubah (depth, blend, cull, dll)
+        boolean depthEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_TEST);
+        boolean blendEnabled = GL11.glGetBoolean(GL11.GL_BLEND);
+        boolean cullEnabled  = GL11.glGetBoolean(GL11.GL_CULL_FACE);
+        int oldDepthFunc = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
+
+        // Setup state untuk outline
+        RenderSystem.enableBlend();
+        RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        RenderSystem.disableCull();
+        GL11.glDepthFunc(GL11.GL_ALWAYS);
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(false);
+        GL11.glLineWidth(3.0f);
+
+        VertexConsumerProvider.Immediate immediate = client.getBufferBuilders().getEntityVertexConsumers();
+        VertexConsumer lineConsumer = immediate.getBuffer(RenderLayer.getLines());
+
+        for (BlockPos pos : spawnerPositions) {
+            drawSpawnerOutline(matrices, lineConsumer, pos);
+        }
+        immediate.draw();
+
+        // Kembalikan state render
+        GL11.glLineWidth(1.0f);
+        RenderSystem.depthMask(true);
+        GL11.glDepthFunc(oldDepthFunc);
+        if (!depthEnabled) RenderSystem.disableDepthTest();
+        if (!blendEnabled) RenderSystem.disableBlend();
+        if (cullEnabled) RenderSystem.enableCull();
+
+        matrices.pop();
     }
+
+
 
     private List<BlockPos> findSpawnersInRange(PlayerEntity player, World world) {
         List<BlockPos> spawners = new ArrayList<>();

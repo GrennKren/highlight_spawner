@@ -5,9 +5,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
@@ -15,6 +13,7 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +25,7 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
     private static final float RED = 1.0F;
     private static final float GREEN = 0.0F;
     private static final float BLUE = 0.0F;
-    private static final float ALPHA = 0.8F;
+    private static final float ALPHA = 1.0F;
 
     @Override
     public void afterTranslucent(WorldRenderContext context) {
@@ -50,19 +49,57 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
             Vec3d cameraPos = context.camera().getPos();
             matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-            // Dapatkan VertexConsumerProvider
-            VertexConsumerProvider.Immediate immediate = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
+            // Simpan state rendering saat ini
+            boolean depthEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_TEST);
+            boolean blendEnabled = GL11.glGetBoolean(GL11.GL_BLEND);
+            boolean cullEnabled = GL11.glGetBoolean(GL11.GL_CULL_FACE);
+            int depthFunc = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
 
-            // Gunakan RenderLayer yang sesuai untuk garis
+            // Setup untuk X-ray rendering yang kuat
+            RenderSystem.enableBlend();
+            RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            RenderSystem.disableCull();
+
+            // Set depth function ke GL_ALWAYS untuk memastikan garis selalu terlihat
+            // ini adalah kunci untuk efek X-ray yang benar
+            GL11.glDepthFunc(GL11.GL_ALWAYS);
+
+            // Tetap aktifkan depth test tapi dengan fungsi ALWAYS
+            // ini membuat garis selalu dirender tanpa peduli apa yang ada di depannya
+            RenderSystem.enableDepthTest();
+
+            // Gunakan line width yang lebih tebal agar mudah terlihat
+            GL11.glLineWidth(3.0f);
+
+            // Dapatkan buffer untuk rendering
+            VertexConsumerProvider.Immediate immediate = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
             VertexConsumer lineConsumer = immediate.getBuffer(RenderLayer.getLines());
 
-            // Render outline untuk setiap spawner
+            // Render semua spawner
             for (BlockPos pos : spawnerPositions) {
                 drawSpawnerOutline(matrices, lineConsumer, pos);
             }
 
-            // Flush buffer untuk memastikan semua yang digambar terlihat
+            // Flush drawing
             immediate.draw();
+
+            // Reset line width
+            GL11.glLineWidth(1.0f);
+
+            // Kembalikan state rendering ke kondisi semula
+            if (depthEnabled) {
+                GL11.glDepthFunc(depthFunc);
+            } else {
+                RenderSystem.disableDepthTest();
+            }
+
+            if (!blendEnabled) {
+                RenderSystem.disableBlend();
+            }
+
+            if (cullEnabled) {
+                RenderSystem.enableCull();
+            }
 
             matrices.pop();
         }
@@ -97,33 +134,38 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
 
     private void drawSpawnerOutline(MatrixStack matrices, VertexConsumer lineConsumer, BlockPos pos) {
         // Buat box sedikit lebih besar dari blok untuk outline
-        Box box = new Box(pos).expand(0.02);
+        Box box = new Box(pos).expand(0.05);
 
         // Dapatkan matrix untuk transformasi posisi
         Matrix4f matrix = matrices.peek().getPositionMatrix();
 
-        // Gunakan metode yang tersedia di 1.21.4 untuk rendering garis
-
         // Bottom face
-        drawLine(lineConsumer, matrix, box.minX, box.minY, box.minZ, box.maxX, box.minY, box.minZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.minY, box.minZ, box.maxX, box.minY, box.maxZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.minY, box.maxZ, box.minX, box.minY, box.maxZ);
-        drawLine(lineConsumer, matrix, box.minX, box.minY, box.maxZ, box.minX, box.minY, box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.minY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.minY, (float)box.minZ);
 
         // Top face
-        drawLine(lineConsumer, matrix, box.minX, box.maxY, box.minZ, box.maxX, box.maxY, box.minZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.maxY, box.minZ, box.maxX, box.maxY, box.maxZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.maxY, box.maxZ, box.minX, box.maxY, box.maxZ);
-        drawLine(lineConsumer, matrix, box.minX, box.maxY, box.maxZ, box.minX, box.maxY, box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.maxY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.minZ);
 
         // Connecting edges
-        drawLine(lineConsumer, matrix, box.minX, box.minY, box.minZ, box.minX, box.maxY, box.minZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.minY, box.minZ, box.maxX, box.maxY, box.minZ);
-        drawLine(lineConsumer, matrix, box.maxX, box.minY, box.maxZ, box.maxX, box.maxY, box.maxZ);
-        drawLine(lineConsumer, matrix, box.minX, box.minY, box.maxZ, box.minX, box.maxY, box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.minZ, (float)box.minX, (float)box.maxY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.minZ, (float)box.maxX, (float)box.maxY, (float)box.minZ);
+        drawLine(lineConsumer, matrix, (float)box.maxX, (float)box.minY, (float)box.maxZ, (float)box.maxX, (float)box.maxY, (float)box.maxZ);
+        drawLine(lineConsumer, matrix, (float)box.minX, (float)box.minY, (float)box.maxZ, (float)box.minX, (float)box.maxY, (float)box.maxZ);
     }
 
-    private void drawLine(VertexConsumer builder, Matrix4f matrix, double x1, double y1, double z1, double x2, double y2, double z2) {
-        builder.vertex(matrix, (float)x1, (float)y1, (float)z1).color(RED, GREEN, BLUE, ALPHA).normal(1, 0, 0).vertex(matrix, (float)x2, (float)y2, (float)z2).color(RED, GREEN, BLUE, ALPHA).normal(1, 0, 0);
+    private void drawLine(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1, float x2, float y2, float z2) {
+        // Vertex pertama
+        builder.vertex(matrix, x1, y1, z1);
+        builder.color(RED, GREEN, BLUE, ALPHA);
+        builder.normal(1, 0, 0);
+        // Vertex kedua
+        builder.vertex(matrix, x2, y2, z2);
+        builder.color(RED, GREEN, BLUE, ALPHA);
+        builder.normal(1, 0, 0);
     }
 }

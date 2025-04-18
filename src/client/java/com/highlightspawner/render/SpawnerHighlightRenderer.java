@@ -168,10 +168,10 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
         // Vertex pertama
         builder.vertex(matrix, x1, y1, z1);
         builder.color(red, green, blue, alpha); // Gunakan parameter warna
-        builder.normal(1, 0, 0);
+        builder.normal(1, 1, 1);
         // Vertex kedua
         builder.vertex(matrix, x2, y2, z2);
         builder.color(red, green, blue, alpha); // Gunakan parameter warna
-        builder.normal(1, 0, 0);
+        builder.normal(1, 1, 1);
     }
 }

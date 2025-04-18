@@ -96,9 +96,9 @@ public class SpawnerHighlightConfig {
                 .addEntry(entryBuilder
                         .startFloatField(Text.of("Outline Offset"), outlineOffset)
                         .setDefaultValue(0.05F)
-                        .setMin(0.01F)
+                        .setMin(0F)
                         .setMax(0.5F)
-                        .setTooltip(Text.of("Jarak outline dari blok (0.01-0.5)"))
+                        .setTooltip(Text.of("Jarak outline dari blok (0-0.5)"))
                         .setSaveConsumer(val -> outlineOffset = val)
                         .build())
                 .addEntry(entryBuilder

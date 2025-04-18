@@ -100,8 +100,15 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
     @SuppressWarnings("deprecation")
     private List<BlockPos> findSpawnersInRange(World world, int activationRange) {
         List<BlockPos> spawners = new ArrayList<>();
-        Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
-        BlockPos playerPos = BlockPos.ofFloored(cameraPos);
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        // Cek apakah player sudah tersedia
+        if (client.player == null) {
+            return spawners;
+        }
+
+        Vec3d playerPosVec = client.player.getPos();
+        BlockPos playerPos = BlockPos.ofFloored(playerPosVec);
 
         // Pastikan kita scan cukup besar agar bisa mencapai spawner di diagonal
         int scanRange = activationRange + 1;
@@ -114,22 +121,21 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
                     if (!world.isChunkLoaded(checkPos)) continue;
 
                     if (world.getBlockState(checkPos).getBlock() == Blocks.SPAWNER) {
-                        // Gunakan metode vanilla Minecraft untuk deteksi pemain dalam jarak
-                        if (world.isPlayerInRange(
-                                checkPos.getX() + 0.5,
-                                checkPos.getY() + 0.5,
-                                checkPos.getZ() + 0.5,
-                                activationRange
-                        )) {
+                        double dx = client.player.getX() - (checkPos.getX() + 0.5);
+                        double dy = client.player.getY() - (checkPos.getY() + 0.5);
+                        double dz = client.player.getZ() - (checkPos.getZ() + 0.5);
+                        double distanceSquared = dx * dx + dy * dy + dz * dz;
+
+                        if (distanceSquared <= activationRange * activationRange) {
                             spawners.add(checkPos);
                         }
                     }
                 }
             }
         }
-
         return spawners;
     }
+
 
     private void drawSpawnerOutline(MatrixStack matrices, VertexConsumer lineConsumer, BlockPos pos, float offset,
                                     float red, float green, float blue, float alpha) {

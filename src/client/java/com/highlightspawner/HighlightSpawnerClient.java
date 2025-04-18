@@ -42,5 +42,11 @@ public class HighlightSpawnerClient implements ClientModInitializer {
 				// Simpan konfigurasi jika diperlukan
 			}
 		});
+
+		// Pastikan konfigurasi dimuat saat mod dimulai
+		SpawnerHighlightConfig.INSTANCE.load();
+
+		// Bentuk lambda yang lebih singkat (expression lambda)
+		Runtime.getRuntime().addShutdownHook(new Thread(SpawnerHighlightConfig.INSTANCE::save));
 	}
 }

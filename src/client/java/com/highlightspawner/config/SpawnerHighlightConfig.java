@@ -1,16 +1,28 @@
 package com.highlightspawner.config;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import net.minecraft.client.gui.screen.Screen;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 public class SpawnerHighlightConfig {
+    // File konfigurasi
+    private static final String CONFIG_FILENAME = "spawner-highlight.json";
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static Path configPath;
+
     // Instance singleton supaya mudah dipakai di mana saja
     public static SpawnerHighlightConfig INSTANCE = new SpawnerHighlightConfig();
 
     // Variabel konfigurasi
-    public float outlineOffset = 0.05F;       // Gap/offset outline
+    public float outlineOffset = 0.05F;
     public float red = 1.0F;
     public float green = 0.0F;
     public float blue = 0.0F;
@@ -18,14 +30,60 @@ public class SpawnerHighlightConfig {
     public int spawnerActivationRange = 16;
     public boolean highlightEnabled = true;
 
-    // (Opsional) Method untuk simpan dan load ke file (gunakan Gson atau library config lain)
-    // Di sini bisa ditambahkan metode load() dan save()
+
+
+    // Constructor dengan auto-load
+    private SpawnerHighlightConfig() {
+        configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILENAME);
+        // load(); // Load konfigurasi saat instance dibuat
+    } static {
+        INSTANCE.load();
+    }
+
+    // Load konfigurasi dari file
+    public void load() {
+        try {
+            if (Files.exists(configPath)) {
+                try (Reader reader = Files.newBufferedReader(configPath)) {
+                    SpawnerHighlightConfig loaded = GSON.fromJson(reader, SpawnerHighlightConfig.class);
+                    if (loaded != null) {
+                        this.outlineOffset = loaded.outlineOffset;
+                        this.red = loaded.red;
+                        this.green = loaded.green;
+                        this.blue = loaded.blue;
+                        this.alpha = loaded.alpha;
+                        this.spawnerActivationRange = loaded.spawnerActivationRange;
+                        this.highlightEnabled = loaded.highlightEnabled;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to load Spawner Highlight config: " + e.getMessage());
+        }
+    }
+
+    // Simpan konfigurasi ke file
+    public void save() {
+        try {
+            if (!Files.exists(configPath.getParent())) {
+                Files.createDirectories(configPath.getParent());
+            }
+
+            try (Writer writer = Files.newBufferedWriter(configPath)) {
+                GSON.toJson(this, writer);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to save Spawner Highlight config: " + e.getMessage());
+        }
+    }
 
     // Contoh method untuk integrasi Cloth Config
     public Screen getConfigScreen(Screen parent) {
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
-                .setTitle(Text.of("Spawner Highlight Config"));
+                .setTitle(Text.of("Spawner Highlight Config"))
+                .setSavingRunnable(this::save); // Tambahkan ini untuk menyimpan otomatis saat tombol Save ditekan
+
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         // Konversi float RGB (0-1) ke int RGB (0-255) dengan lebih presisi

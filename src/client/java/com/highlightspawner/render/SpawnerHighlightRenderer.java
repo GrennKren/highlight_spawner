@@ -8,7 +8,6 @@ import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
@@ -20,13 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTranslucent {
-    // Radius di mana spawner akan aktif (dalam blok)
-    private static final int SPAWNER_ACTIVATION_RANGE = 16;
     // Warna outline (RGBA)
-    private static final float RED = 1.0F;
-    private static final float GREEN = 0.0F;
-    private static final float BLUE = 0.0F;
-    private static final float ALPHA = 1.0F;
 
     @Override
     public void afterTranslucent(WorldRenderContext context) {
@@ -43,21 +36,28 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
         float alpha = SpawnerHighlightConfig.INSTANCE.alpha;
         int activationRange = SpawnerHighlightConfig.INSTANCE.spawnerActivationRange;
 
-
-
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) {
             return;
         }
 
         // Gunakan nilai activationRange dari konfigurasi saat mencari spawner
-        List<BlockPos> spawnerPositions = findSpawnersInRange(client.player, client.world, activationRange);
+        List<BlockPos> spawnerPositions = findSpawnersInRange(client.world, activationRange);
         if (spawnerPositions.isEmpty()) {
             return;
         }
 
-
         MatrixStack matrices = context.matrixStack();
+        // Tambahkan pengecekan null untuk matrices
+        if (matrices == null) {
+            return;
+        }
+
+        // Pengecekan untuk camera juga
+        if (context.camera() == null) {
+            return;
+        }
+
         matrices.push();
         Vec3d cameraPos = context.camera().getPos();
         matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
@@ -97,23 +97,30 @@ public class SpawnerHighlightRenderer implements WorldRenderEvents.AfterTransluc
     }
 
 
-
-    private List<BlockPos> findSpawnersInRange(PlayerEntity player, World world, int activationRange) {
+    @SuppressWarnings("deprecation")
+    private List<BlockPos> findSpawnersInRange(World world, int activationRange) {
         List<BlockPos> spawners = new ArrayList<>();
-        BlockPos playerPos = player.getBlockPos();
+        Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
+        BlockPos playerPos = BlockPos.ofFloored(cameraPos);
 
-        // Scan sekitar area pemain untuk mencari spawner
-        int scanRange = activationRange + 4; // Sedikit lebih jauh dari activation range
+        // Pastikan kita scan cukup besar agar bisa mencapai spawner di diagonal
+        int scanRange = activationRange + 1;
 
         for (int x = -scanRange; x <= scanRange; x++) {
             for (int y = -scanRange; y <= scanRange; y++) {
                 for (int z = -scanRange; z <= scanRange; z++) {
                     BlockPos checkPos = playerPos.add(x, y, z);
 
-                    // Cek apakah blok adalah spawner
+                    if (!world.isChunkLoaded(checkPos)) continue;
+
                     if (world.getBlockState(checkPos).getBlock() == Blocks.SPAWNER) {
-                        // Cek jarak menggunakan squared distance (lebih efisien)
-                        if (checkPos.getSquaredDistance(playerPos) <= activationRange * activationRange) {
+                        // Gunakan metode vanilla Minecraft untuk deteksi pemain dalam jarak
+                        if (world.isPlayerInRange(
+                                checkPos.getX() + 0.5,
+                                checkPos.getY() + 0.5,
+                                checkPos.getZ() + 0.5,
+                                activationRange
+                        )) {
                             spawners.add(checkPos);
                         }
                     }
